@@ -3,64 +3,174 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jane Doe</title>
+<title>Amandin Chyba</title>
 <meta name="description" content="Jane Doe — PhD student in numerical analysis at NYU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="wrap">
+<!-- Motion-blur trail for the profile picture (used by .avatar in style.css) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="motion-blur" x="-60%" y="0" width="160%" height="100%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="10 0" result="blur"/>
+    <feOffset in="blur" dx="-18" dy="0" result="trail"/>
+    <feColorMatrix in="trail" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.6 0" result="faded"/>
+    <feMerge>
+      <feMergeNode in="faded"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+</svg>
+<div class="layout">
 
-  <header class="site-header">
-    <p class="site-name"><a href="index.html">Jane Doe</a></p>
-    <p class="site-tagline">PhD candidate, numerical analysis — Courant Institute, NYU</p>
-    <nav class="site-nav">
-      <a href="index.html" class="current">About</a>
-      <a href="teaching.html">Teaching</a>
-      <a href="publications.html">Publications</a>
-      <a href="talks.html">Talks</a>
-      <a href="extra.html">Extra</a>
-    </nav>
-  </header>
-
-  <main>
-    <p class="lede">
-      I'm a PhD student in the Department of Mathematics at NYU's Courant
-      Institute, advised by <a href="#">Prof. Advisor Name</a>. I work on
-      numerical analysis, mostly on the design and analysis of discretization
-      schemes for partial differential equations, and on getting error bounds
-      that actually hold up in practice.
-    </p>
-    <p>
-      Before NYU I did &lt;undergrad / prior institution&gt;, where I got
-      interested in the gap between what a method proves and what it does
-      on a computer. That gap is still mostly what I think about.
-    </p>
-
-    <h2 class="section-title">Details</h2>
-    <ul class="meta-list">
-      <li><span class="k">Name</span><span class="v">Jane Doe</span></li>
-      <li><span class="k">Advisor</span><span class="v"><a href="#">Prof. Advisor Name</a></span></li>
-      <li><span class="k">Dept.</span><span class="v">Mathematics, Courant Institute</span></li>
-      <li><span class="k">University</span><span class="v">New York University</span></li>
-      <li><span class="k">Email</span><span class="v"><a href="mailto:jd1234@nyu.edu">jd1234@nyu.edu</a></span></li>
-      <li><span class="k">Office</span><span class="v">Warren Weaver Hall, Room &lt;###&gt;</span></li>
-    </ul>
-
-    <h2 class="section-title">Research interests</h2>
-    <div class="interests">
-      <span>finite element methods</span>
-      <span>a posteriori error estimation</span>
-      <span>PDE-constrained optimization</span>
-      <span>scientific computing</span>
+  <aside class="sidebar">
+    <img class="avatar" src="profile2.JPG" alt="Amandin Chyba">
+    <div class="profile-text">
+      <div class="identity">
+        <p class="site-name">Amandin Chyba</p>
+        <p class="site-tagline">PhD candidate (Mathematics) and co-owner of kzcomp</p>
+      </div>
+      <ul class="meta-list">
+        <li>Email: atc9782[at]nyu[dot]edu</li>
+        <li>Office: New York University, 1007 WWH</li>
+        <li>Advisor: <a href="https://cims.nyu.edu/~oneil/">Mike O'Neil</a></li>
+      </ul>
     </div>
-  </main>
 
-  <footer class="site-footer">
-    Last updated September 2026
-  </footer>
+    <div class="interests">
+      <span>Numerical Analysis</span>
+      <span>Boundary Integral Equations</span>
+      <span>Domain Decomposition Methods</span>
+      <span>Electromagnetics</span>
+    </div>
+
+    <nav class="site-nav">
+      <a href="#bio">BIO</a>
+      <a href="#talks">TALKS</a>
+      <a href="#publications">PUBLICATIONS</a>
+      <a href="#teaching">TEACHING</a>
+      <a href="#kreedz">KZCOMP</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+
+    <section id="bio">
+      <h2 class="section-title">Bio</h2>
+      <ul class="entry-list">
+        <li class="entry">
+          <span class="entry-year">Present</span>
+          <span class="entry-title">Courant Institute at New York University</span>
+          <span class="entry-role">Mathematics PhD</span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">May 2023</span>
+          <span class="entry-title">Colorado School of Mines</span>
+          <span class="entry-role">Applied Mathematics B.S.</span>
+        </li>
+      </ul>
+    </section>
+
+     <section id="talks">
+      <h2 class="section-title">Talks</h2>
+      <ul class="entry-list">
+        <li class="entry">
+          <span class="entry-year">Aug 2026</span>
+          <span class="entry-title">A Harmonic Path to Coffee
+          <span class="entry-role">AMCS Conference University of Iowa</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Jul 2026</span>
+          <span class="entry-title">Magnetostatic scattering from axisymmetric open annuli
+          <span class="entry-role">International Conference on Advances in Numerical Integration</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Jul 2026</span>
+          <span class="entry-title">Magnetostatic scattering from axisymmetric open surfaces
+          <span class="entry-role">SciCADE Conference</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Aug 2025</span>
+          <span class="entry-title">Solving Laplace’s equation with boundary integral equations for axisymmetric, open surfaces
+          <span class="entry-role">Seminaire d’analyse numerique University of Geneva</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Aug 2022</span>
+          <span class="entry-title">Solving the Screened Poisson Equation with Walk-on-Boundary Markov Chains and Deep Learning
+          <span class="entry-role">FUSRP Conference Fields Institute</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Apr 2021</span>
+          <span class="entry-title">Capturing the Qualitative Behavior of the Spread of COVID-19 in Colorado Counties Using Merge Trees
+          <span class="entry-role">MURF Symposium Colorado School of Mines</span></span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Jan 2021</span>
+          <span class="entry-title">A Two-Stage Deep Learning Detection Classifier for the ATLAS Asteroid Survey
+          <span class="entry-role">Graduate Seminar Institute of Astronomy University of Hawaii at Manoa</span></span>
+        </li>
+      </ul>
+    </section>
+    
+    <section id="publications">
+      <h2 class="section-title">Publications</h2>
+      <ul class="entry-list">
+        <li class="entry">
+          <span class="entry-year">2026</span>
+          <span class="entry-title">On Logical Extrapolation for Mazes with Recurrent and Implicit Networks
+          <span class="entry-role">with B. Knutson, M. Ivanitskiy, J. Pettyjohn, C. Diniz Behn, S. Wu Fung, D. McKenzie · AAAI 2026 (oral)</span></span>
+          <a class="entry-role" href="https://arxiv.org/abs/2410.03020">paper</a>
+        </li>
+        <li class="entry">
+          <span class="entry-year">2022</span>
+          <span class="entry-title">Discovery of Discrete Stages in the Oxidation of exo-Tetrahydrodicyclopentadiene (C<sub>10</sub>H<sub>16</sub>) Droplets Doped with Titanium–Aluminum–Boron Reactive Mixed-Metal Nanopowder
+          <span class="entry-role">with I. Antonov, S. D. Perera, A. Turner, M. Pantoya, M. Finn, A. Epshteyn, R. I. Kaiser · The Journal of Physical Chemistry Letters</span></span>
+          <a class="entry-role" href="https://doi.org/10.1021/acs.jpclett.2c02638">paper</a>
+        </li>
+        <li class="entry">
+          <span class="entry-year">2021</span>
+          <span class="entry-title">A Two-Stage Deep Learning Detection Classifier for the ATLAS Asteroid Survey
+          <span class="entry-role">with L. Denneau · Publications of the Astronomical Society of the Pacific</span></span>
+          <a class="entry-role" href="https://doi.org/10.1088/1538-3873/abc900">paper</a>
+        </li>
+      </ul>
+    </section>
+
+   
+    <section id="teaching">
+      <h2 class="section-title">Teaching</h2>
+      <ul class="entry-list">
+        <li class="entry">
+          <span class="entry-year">Fa 2026</span>
+          <span class="entry-title">Calculus III</span>
+          <span class="entry-role">Teaching Assistant</span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Sp 2026</span>
+          <span class="entry-title">Linear Algebra</span>
+          <span class="entry-role">Teaching Assistant</span>
+        </li>
+        <li class="entry">
+          <span class="entry-year">Fa 2025</span>
+          <span class="entry-title">Numerical Analysis</span>
+          <span class="entry-role">Teaching Assistant</span>
+        </li>
+      </ul>
+    </section>
+
+    <section id="kreedz">
+      <h2 class="section-title">KZCOMP</h2>
+      <a href="https://kzcomp.com" class="kreedz-badge-link">
+        <img src="kzcomp.png" alt="kzcomp.com" class="kreedz-badge">
+      </a>
+      <p class="kreedz-description">
+        Since 2023, I have co-owned <a href="https://kzcomp.com">kzcomp.com</a>, a platform for hosting Kreedz tournaments.
+      </p>
+    </section>
+
+  </main>
 
 </div>
 </body>
