@@ -7,7 +7,7 @@
 <meta name="description" content="Amandin Chyba — PhD student at NYU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script>
 (function () {
@@ -20,23 +20,9 @@
 </script>
 </head>
 <body>
-<!-- Motion-blur trail for the profile picture (used by .avatar in style.css) -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="motion-blur" x="-60%" y="0" width="160%" height="100%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="10 0" result="blur"/>
-    <feOffset in="blur" dx="-18" dy="0" result="trail"/>
-    <feColorMatrix in="trail" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.6 0" result="faded"/>
-    <feMerge>
-      <feMergeNode in="faded"/>
-      <feMergeNode in="SourceGraphic"/>
-    </feMerge>
-  </filter>
-</svg>
-
-
-<!-- Blob tracker: scattered boxes on the background that light up
-     and connect to the cursor with a line once it gets close -->
-<svg class="blob-tracker" id="blobTracker" aria-hidden="true"></svg>
+<!-- Background field: scroll-driven contour plot, adaptive quadtree and
+     domain decomposition sweep, drawn by script.js -->
+<canvas class="bg-field" id="bgField" aria-hidden="true"></canvas>
 
 <!-- Fixed header bar: name centered, nav top-right, stays on top while scrolling -->
 <header class="top-bar" id="topBar">
@@ -52,15 +38,23 @@
   </nav>
 </header>
 
-<!-- Vertical barcode acting as a stylized scroll indicator -->
-<div class="barcode-scrollbar" id="barcodeScrollbar" role="scrollbar" aria-label="Scroll position" aria-hidden="true">
-  <div class="barcode-bars"></div>
+<!-- Matrix scroller: the block-diagonal matrix of the background's domain
+     decomposition, doubling as the scroll indicator. Click or drag along
+     the diagonal to scroll. -->
+<div class="matrix-scroller" id="matrixScroller" aria-hidden="true">
+  <canvas class="matrix-canvas" id="matrixCanvas"></canvas>
+  <p class="matrix-caption">
+    <span class="matrix-caption-eq">A = diag(A₁…A₄)</span>
+    <span id="matrixLabel">SUBDOMAIN Ω1/4</span>
+  </p>
 </div>
 
 <div class="layout">
 
   <aside class="sidebar">
-    <img class="avatar" src="profile2.JPG" alt="Amandin Chyba">
+    <div class="avatar-frame">
+      <img class="avatar" src="images/profile.jpg" alt="Amandin Chyba" width="256" height="256">
+    </div>
     <div class="profile-text">
       <div class="identity">
         <p class="site-tagline">PhD candidate (Mathematics) and co-founder of <a href="https://kzcomp.com">kzcomp.com</a></p>
@@ -191,25 +185,15 @@
         In 2023 I founded <a href="https://kzcomp.com">kzcomp.com</a>, a platform for hosting Kreedz tournaments.
       </p>
 
+      <!-- Gallery tiles: the first one is the large hero tile. To add an image, put the
+           full-size file in originals/, run make-images.py, and add a line here. -->
       <div class="kreedz-gallery">
-        <button class="gallery-item" data-full="kzcomp1.png" aria-label="Open graphic 1">
-          <img src="kzcomp1.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
-        </button>
-        <button class="gallery-item" data-full="kzcomp2.png" aria-label="Open graphic 2">
-          <img src="kzcomp2.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
-        </button>
-        <button class="gallery-item" data-full="kzcomp3.png" aria-label="Open graphic 3">
-          <img src="kzcomp3.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
-        </button>
-        <button class="gallery-item" data-full="kzcomp4.png" aria-label="Open graphic 4">
-          <img src="kzcomp4.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
-        </button>
-        <button class="gallery-item" data-full="kzcomp5.jpg" aria-label="Open graphic 5">
-          <img src="kzcomp5.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async">
-        </button>
-        <button class="gallery-item" data-full="kzcomp6.jpg" aria-label="Open graphic 6">
-          <img src="kzcomp6.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async">
-        </button>
+        <button class="gallery-item"><img src="images/kzcomp4.jpg" alt="CKZ World Championship 2026 key art" loading="lazy" decoding="async"></button>
+        <button class="gallery-item"><img src="images/kzcomp1.jpg" alt="KZCOMP 2026 promotional graphic" loading="lazy" decoding="async"></button>
+        <button class="gallery-item"><img src="images/kzcomp2.jpg" alt="KZCOMP poster" loading="lazy" decoding="async"></button>
+        <button class="gallery-item"><img src="images/kzcomp3.jpg" alt="KZCOMP poster" loading="lazy" decoding="async"></button>
+        <button class="gallery-item"><img src="images/kzcomp5.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async"></button>
+        <button class="gallery-item"><img src="images/kzcomp6.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async"></button>
       </div>
     </section>
 
@@ -219,7 +203,12 @@
 
 <div class="lightbox" id="lightbox" aria-hidden="true">
   <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
-  <img class="lightbox-img" id="lightboxImg" src="" alt="">
+  <button class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Previous image">&larr;</button>
+  <figure class="lightbox-figure">
+    <img class="lightbox-img" id="lightboxImg" src="" alt="">
+    <figcaption class="lightbox-caption" id="lightboxCaption"></figcaption>
+  </figure>
+  <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Next image">&rarr;</button>
 </div>
 
 <button class="dark-toggle" id="darkModeToggle" aria-pressed="false" aria-label="Toggle dark mode">

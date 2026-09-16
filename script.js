@@ -1,344 +1,530 @@
 (function () {
   "use strict";
 
+  var root = document.documentElement;
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* ---------------------------------------------------------
-     Barcode scroll indicator (the strip itself scrolls)
-  --------------------------------------------------------- */
-  var barcode = document.getElementById("barcodeScrollbar");
-  var bars = barcode ? barcode.querySelector(".barcode-bars") : null;
-
-  function scrollableHeight() {
-    return Math.max(
-      document.documentElement.scrollHeight - window.innerHeight,
-      1
-    );
-  }
-
-  function updateBarcodeBars() {
-    var ratio = (window.scrollY || window.pageYOffset) / scrollableHeight();
-    ratio = Math.min(Math.max(ratio, 0), 1);
-    var travel = bars.offsetHeight - barcode.clientHeight;
-    bars.style.transform = "translateY(" + (-ratio * travel) + "px)";
-  }
-
-  if (barcode && bars) {
-    window.addEventListener("scroll", updateBarcodeBars, { passive: true });
-    window.addEventListener("resize", updateBarcodeBars);
-    updateBarcodeBars();
-
-    barcode.addEventListener("click", function (e) {
-      var rect = barcode.getBoundingClientRect();
-      var ratio = (e.clientY - rect.top) / rect.height;
-      var behavior = reduceMotion ? "auto" : "smooth";
-      window.scrollTo({ top: ratio * scrollableHeight(), behavior: behavior });
-    });
+  function clamp(v, lo, hi) {
+    return Math.min(Math.max(v, lo), hi);
   }
 
   /* ---------------------------------------------------------
-     Blob tracker: scattered boxes of different sizes only show
-     up within an annulus (a ring, not a filled disc) around the
-     cursor - hidden both when far away and when right on top of
-     the cursor. Currently-visible boxes tether to each other
-     (not to the cursor) whenever two of them are close enough,
-     forming a small constellation that shifts as you move. Each
-     visible box also fades in a small patch of the background
-     grid at its own position (a real element that fades via
-     opacity, not a mask reveal), so the grid only ever appears
-     co-located with a box.
+     Background field: one canvas that plays a "solve" driven
+     by scroll position.
+       - contour lines of a potential u = sum q log|x - s|
+         (sources drift and levels flow as you scroll)
+       - an FMM-style adaptive quadtree over point clusters
+         that refines one level at a time as you scroll down
+       - an overlapping domain decomposition whose active
+         subdomain sweeps left to right (highlighted contours)
+       - a block-diagonal / hierarchical matrix that mirrors the
+         tree and the sweep, drawn in the bottom-right corner where
+         it doubles as the scroll indicator (click / drag)
+     Everything is a pure function of scroll, so scrolling back
+     up un-refines. It only redraws while the scroll position is
+     changing, and is faded out behind the text column.
   --------------------------------------------------------- */
-  function matrixLabel(size) {
-    var n = size < 18 ? 4 : size < 24 ? 8 : size < 32 ? 16 : size < 40 ? 32 : size < 48 ? 64 : 128;
-    return n + "x" + n;
-  }
+  var field = document.getElementById("bgField");
+  var mCanvas = document.getElementById("matrixCanvas");
 
-  var blobTracker = document.getElementById("blobTracker");
-  if (blobTracker) {
-    var SVG_NS2 = "http://www.w3.org/2000/svg";
-    var ANNULUS_INNER = 260;
-    var ANNULUS_OUTER = 620;
-    var BOX_LINK_DIST = 380;
-    var blobAnchors = [
-      { xPct: 0.08, yPct: 0.1, size: 30 },
-      { xPct: 0.34, yPct: 0.06, size: 20 },
-      { xPct: 0.62, yPct: 0.09, size: 44 },
-      { xPct: 0.9, yPct: 0.12, size: 54 },
-      { xPct: 0.06, yPct: 0.38, size: 24 },
-      { xPct: 0.28, yPct: 0.32, size: 16 },
-      { xPct: 0.5, yPct: 0.28, size: 38 },
-      { xPct: 0.72, yPct: 0.35, size: 22 },
-      { xPct: 0.94, yPct: 0.4, size: 48 },
-      { xPct: 0.1, yPct: 0.65, size: 40 },
-      { xPct: 0.32, yPct: 0.7, size: 18 },
-      { xPct: 0.56, yPct: 0.6, size: 28 },
-      { xPct: 0.8, yPct: 0.68, size: 34 },
-      { xPct: 0.9, yPct: 0.88, size: 50 },
-      { xPct: 0.6, yPct: 0.9, size: 22 },
-      { xPct: 0.2, yPct: 0.9, size: 32 },
-      { xPct: 0.18, yPct: 0.2, size: 26 },
-      { xPct: 0.46, yPct: 0.14, size: 18 },
-      { xPct: 0.78, yPct: 0.2, size: 36 },
-      { xPct: 0.16, yPct: 0.5, size: 20 },
-      { xPct: 0.4, yPct: 0.48, size: 30 },
-      { xPct: 0.64, yPct: 0.46, size: 16 },
-      { xPct: 0.86, yPct: 0.52, size: 26 },
-      { xPct: 0.06, yPct: 0.85, size: 22 },
-      { xPct: 0.46, yPct: 0.75, size: 44 },
-      { xPct: 0.7, yPct: 0.85, size: 20 },
-      { xPct: 0.94, yPct: 0.75, size: 32 },
-      { xPct: 0.28, yPct: 0.05, size: 14 }
+  if (field && mCanvas) {
+    var ctx = field.getContext("2d");
+    var mctx = mCanvas.getContext("2d");
+    var mScroller = document.getElementById("matrixScroller");
+    var mLabel = document.getElementById("matrixLabel");
+    var column = document.querySelector(".main-content");
+
+    var N_SUB = 4;           // subdomains
+    var SUB_OVERLAP = 0.035; // overlap (fraction of width) on each side
+    var MIN_DEPTH = 2;
+    var MAX_DEPTH = 7;
+    var LEAF_CAP = 8;        // points per leaf before refining
+    var LEVEL_STEP = 0.2;    // contour spacing in u
+
+    var W = 0, H = 0, S = 1, DPR = 1, GRID = 10, M_SIZE = 0;
+    var colLeft = 0, colRight = 0, scrollMax = 1;
+    var colors = {};
+    var values = new Float32Array(0); // potential on the grid, reused between frames
+
+    var seed = 20231;
+    function rand() {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    }
+    function gauss() {
+      return Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+    }
+
+    var sources = [
+      { x: 0.12, y: 0.34, q: 1.0,  spread: 0.07, n: 90,  orbit: 0.05, phase: 0.0, speed: 0.8 },
+      { x: 0.88, y: 0.26, q: -0.9, spread: 0.06, n: 80,  orbit: 0.04, phase: 2.1, speed: -1.0 },
+      { x: 0.83, y: 0.80, q: 1.1,  spread: 0.08, n: 100, orbit: 0.05, phase: 4.0, speed: 0.6 },
+      { x: 0.16, y: 0.84, q: -1.0, spread: 0.05, n: 70,  orbit: 0.04, phase: 1.3, speed: -0.7 },
+      { x: 0.52, y: 0.58, q: 0.6,  spread: 0.10, n: 60,  orbit: 0.07, phase: 5.2, speed: 0.5 }
     ];
-
-    blobAnchors.forEach(function (a) {
-      a.rect = document.createElementNS(SVG_NS2, "rect");
-      a.rect.setAttribute("class", "blob-box");
-      blobTracker.appendChild(a.rect);
-
-      a.label = document.createElementNS(SVG_NS2, "text");
-      a.label.setAttribute("class", "blob-label");
-      a.label.textContent = matrixLabel(a.size);
-      blobTracker.appendChild(a.label);
-
-      a.patch = document.createElement("div");
-      a.patch.className = "grid-patch";
-      document.body.appendChild(a.patch);
+    var points = [];
+    sources.forEach(function (s) {
+      for (var k = 0; k < s.n; k++) {
+        points.push({ src: s, ox: gauss() * s.spread, oy: gauss() * s.spread, x: 0, y: 0 });
+      }
     });
 
-    var blobLinks = [];
-    for (var i = 0; i < blobAnchors.length; i++) {
-      for (var j = i + 1; j < blobAnchors.length; j++) {
-        var link = document.createElementNS(SVG_NS2, "line");
-        link.setAttribute("class", "blob-line");
-        blobTracker.appendChild(link);
-        blobLinks.push({ a: blobAnchors[i], b: blobAnchors[j], el: link });
+    function readColors() {
+      var cs = getComputedStyle(root);
+      var dark = root.getAttribute("data-theme") === "dark";
+      colors.ink = cs.getPropertyValue("--ink").trim();
+      colors.soft = cs.getPropertyValue("--ink-soft").trim();
+      colors.accent = cs.getPropertyValue("--accent").trim();
+      // light mode needs more ink to read against the cream paper
+      colors.tone = dark
+        ? { line: 0.14, tree: 0.2, pts: 0.35, acc: 0.42, fade: 0.82, matrix: 0.6 }
+        : { line: 0.3, tree: 0.4, pts: 0.55, acc: 0.62, fade: 0.78, matrix: 0.8 };
+    }
+
+    // Canvas sizes follow their CSS boxes. Reallocating a canvas is
+    // expensive, so only do it when the size actually changed (phones
+    // fire resize whenever the URL bar shows or hides).
+    function measure() {
+      var r = column.getBoundingClientRect();
+      colLeft = r.left;
+      colRight = r.right;
+      scrollMax = Math.max(root.scrollHeight - window.innerHeight, 1);
+
+      var w = field.clientWidth, h = field.clientHeight;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var m = mCanvas.clientWidth;
+      if (w === W && h === H && dpr === DPR && m === M_SIZE) return;
+      W = w; H = h; DPR = dpr; M_SIZE = m;
+      S = Math.min(W, H);
+      GRID = Math.max(10, Math.round(W / 160)); // coarser grid on very wide screens
+      field.width = Math.round(W * DPR);
+      field.height = Math.round(H * DPR);
+      mCanvas.width = mCanvas.height = Math.round(M_SIZE * DPR);
+    }
+
+    /* --- geometry at scroll progress p --- */
+    function placeSources(p) {
+      var i, s, pt;
+      for (i = 0; i < sources.length; i++) {
+        s = sources[i];
+        var t = 2 * Math.PI * p * s.speed + s.phase;
+        s.cx = (s.x + s.orbit * Math.cos(t)) * W;
+        s.cy = (s.y + s.orbit * Math.sin(t)) * H;
+      }
+      for (i = 0; i < points.length; i++) {
+        pt = points[i];
+        pt.x = pt.src.cx + pt.ox * S;
+        pt.y = pt.src.cy + pt.oy * S;
       }
     }
 
-    var blobTargetX = window.innerWidth / 2;
-    var blobTargetY = window.innerHeight / 2;
-    var blobCurX = blobTargetX;
-    var blobCurY = blobTargetY;
-    var blobActive = false;
-
-    function updateBlobPositions() {
-      blobAnchors.forEach(function (a) {
-        a.x = a.xPct * window.innerWidth;
-        a.y = a.yPct * window.innerHeight;
-        a.rect.setAttribute("x", a.x - a.size / 2);
-        a.rect.setAttribute("y", a.y - a.size / 2);
-        a.rect.setAttribute("width", a.size);
-        a.rect.setAttribute("height", a.size);
-        a.label.setAttribute("x", a.x + a.size / 2 + 6);
-        a.label.setAttribute("y", a.y + 3);
-        a.patch.style.left = a.x + "px";
-        a.patch.style.top = a.y + "px";
-      });
+    function potential(x, y) {
+      var u = 0;
+      for (var i = 0; i < sources.length; i++) {
+        var s = sources[i];
+        var dx = (x - s.cx) / S, dy = (y - s.cy) / S;
+        u += s.q * 0.5 * Math.log(dx * dx + dy * dy + 0.0015);
+      }
+      return u;
     }
-    updateBlobPositions();
-    window.addEventListener("resize", updateBlobPositions);
 
-    window.addEventListener(
-      "mousemove",
-      function (e) {
-        blobTargetX = e.clientX;
-        blobTargetY = e.clientY;
-        if (!blobActive) {
-          blobActive = true;
-          blobTracker.classList.add("is-active");
-          blobCurX = blobTargetX;
-          blobCurY = blobTargetY;
+    // marching squares: edge pairs per case (0 top, 1 right, 2 bottom, 3 left)
+    var CASES = [[], [3, 2], [2, 1], [3, 1], [0, 1], [0, 1, 2, 3], [0, 2], [0, 3],
+                 [0, 3], [0, 2], [0, 3, 1, 2], [0, 1], [3, 1], [1, 2], [3, 2], []];
+    var ex = [0, 0, 0, 0], ey = [0, 0, 0, 0];
+
+    // Returns the contour path. Segments inside a highlighted strip are
+    // also added to that strip's own path, so the accent pass strokes
+    // only those instead of re-stroking everything through a clip.
+    function contours(phase, strips) {
+      var cols = Math.ceil(W / GRID) + 1, rows = Math.ceil(H / GRID) + 1;
+      if (values.length < cols * rows) values = new Float32Array(cols * rows);
+      var v = values, i, j, k, m, n;
+      for (j = 0; j < rows; j++) {
+        for (i = 0; i < cols; i++) v[j * cols + i] = potential(i * GRID, j * GRID);
+      }
+
+      var path = new Path2D();
+      for (j = 0; j < rows - 1; j++) {
+        for (i = 0; i < cols - 1; i++) {
+          var a = v[j * cols + i], b = v[j * cols + i + 1];
+          var c = v[(j + 1) * cols + i + 1], d = v[(j + 1) * cols + i];
+          var k0 = Math.ceil((Math.min(a, b, c, d) - phase) / LEVEL_STEP);
+          var k1 = Math.floor((Math.max(a, b, c, d) - phase) / LEVEL_STEP);
+          if (k1 < k0) continue;
+          var x0 = i * GRID, y0 = j * GRID, x1 = x0 + GRID, y1 = y0 + GRID;
+          var mid = x0 + GRID / 2;
+          for (k = k0; k <= k1; k++) {
+            var L = phase + k * LEVEL_STEP;
+            var seg = CASES[(a >= L ? 8 : 0) | (b >= L ? 4 : 0) | (c >= L ? 2 : 0) | (d >= L ? 1 : 0)];
+            if (!seg.length) continue;
+            ex[0] = x0 + GRID * (L - a) / (b - a); ey[0] = y0;
+            ex[1] = x1; ey[1] = y0 + GRID * (L - b) / (c - b);
+            ex[2] = x0 + GRID * (L - d) / (c - d); ey[2] = y1;
+            ex[3] = x0; ey[3] = y0 + GRID * (L - a) / (d - a);
+            for (m = 0; m < seg.length; m += 2) {
+              path.moveTo(ex[seg[m]], ey[seg[m]]);
+              path.lineTo(ex[seg[m + 1]], ey[seg[m + 1]]);
+              for (n = 0; n < strips.length; n++) {
+                if (mid >= strips[n].x0 && mid < strips[n].x1) {
+                  strips[n].path.moveTo(ex[seg[m]], ey[seg[m]]);
+                  strips[n].path.lineTo(ex[seg[m + 1]], ey[seg[m + 1]]);
+                }
+              }
+            }
+          }
         }
-      },
-      { passive: true }
-    );
+      }
+      return path;
+    }
 
-    document.addEventListener("mouseleave", function () {
-      blobActive = false;
-      blobTracker.classList.remove("is-active");
+    // adaptive quadtree; returns split lines grouped by child level
+    function quadtree(depth) {
+      var levels = [];
+      for (var l = 0; l <= MAX_DEPTH; l++) levels.push(new Path2D());
+      var cap = Math.ceil(depth);
+      var R = Math.max(W, H);
+      (function rec(x, y, s, lvl, pts) {
+        if (lvl >= cap || (lvl >= MIN_DEPTH && pts.length <= LEAF_CAP)) return;
+        var h = s / 2, mx = x + h, my = y + h;
+        levels[lvl + 1].moveTo(mx, y); levels[lvl + 1].lineTo(mx, y + s);
+        levels[lvl + 1].moveTo(x, my); levels[lvl + 1].lineTo(x + s, my);
+        var q = [[], [], [], []];
+        for (var i = 0; i < pts.length; i++) {
+          q[(pts[i].x >= mx ? 1 : 0) + (pts[i].y >= my ? 2 : 0)].push(pts[i]);
+        }
+        rec(x, y, h, lvl + 1, q[0]);
+        rec(mx, y, h, lvl + 1, q[1]);
+        rec(x, my, h, lvl + 1, q[2]);
+        rec(mx, my, h, lvl + 1, q[3]);
+      })((W - R) / 2, (H - R) / 2, R, 0, points);
+      return levels;
+    }
+
+    function weight(active, i) {
+      return Math.max(0, 1 - Math.abs(active - i));
+    }
+
+    // block-diagonal matrix with hierarchical (HODLR-like) blocks
+    function drawMatrix(p, depth, active) {
+      var g = mctx, M = M_SIZE - 1, bs = M / N_SUB, i;
+      var hier = Math.max(0, depth - MIN_DEPTH);
+      var base = colors.tone.matrix;
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      g.clearRect(0, 0, M_SIZE, M_SIZE);
+      g.lineWidth = 1;
+      g.strokeStyle = g.fillStyle = colors.soft;
+      g.globalAlpha = base;
+      g.strokeRect(0.5, 0.5, M, M);
+
+      // coupling between neighbouring subdomains (from the overlap)
+      g.globalAlpha = base * 0.35;
+      var o = bs * 0.22;
+      for (i = 1; i < N_SUB; i++) {
+        g.fillRect(0.5 + i * bs, 0.5 + i * bs - o, o, o);
+        g.fillRect(0.5 + i * bs - o, 0.5 + i * bs, o, o);
+      }
+
+      function block(x, y, s, lvl) {
+        var w = clamp(hier - lvl, 0, 1);
+        if (lvl >= 4 || w === 0) {
+          g.globalAlpha = base * 0.45;
+          g.fillRect(x, y, s, s);
+          return;
+        }
+        // off-diagonal blocks are low rank: outline plus a thin U V^T strip
+        var h = s / 2, r = Math.max(1, h * 0.12);
+        g.globalAlpha = base * 0.6 * w;
+        g.strokeRect(x + h, y, h, h);
+        g.strokeRect(x, y + h, h, h);
+        g.globalAlpha = base * 0.45 * w;
+        g.fillRect(x + h, y, r, h);
+        g.fillRect(x + h, y, h, r);
+        g.fillRect(x, y + h, r, h);
+        g.fillRect(x, y + h, h, r);
+        if (w < 1) {
+          g.globalAlpha = base * 0.45 * (1 - w);
+          g.fillRect(x, y, s, s);
+        }
+        block(x, y, h, lvl + 1);
+        block(x + h, y + h, h, lvl + 1);
+      }
+      for (i = 0; i < N_SUB; i++) block(0.5 + i * bs, 0.5 + i * bs, bs, 0);
+
+      g.strokeStyle = g.fillStyle = colors.accent;
+      for (i = 0; i < N_SUB; i++) {
+        var aw = weight(active, i);
+        if (!aw) continue;
+        g.globalAlpha = 0.18 * aw;
+        g.fillRect(0.5 + i * bs, 0.5 + i * bs, bs, bs);
+        g.globalAlpha = 0.9 * aw;
+        g.strokeRect(0.5 + i * bs, 0.5 + i * bs, bs, bs);
+      }
+
+      // scroll position: current row / column of the matrix
+      var t = Math.round(p * M) + 0.5;
+      g.globalAlpha = 0.45;
+      g.beginPath();
+      g.moveTo(0, t); g.lineTo(M + 1, t);
+      g.moveTo(t, 0); g.lineTo(t, M + 1);
+      g.stroke();
+      g.globalAlpha = 1;
+      g.fillRect(t - 2.5, t - 2.5, 5, 5);
+
+      var label = "SUBDOMAIN Ω" + Math.min(N_SUB, Math.round(active) + 1) + "/" + N_SUB;
+      if (mLabel.textContent !== label) mLabel.textContent = label;
+    }
+
+    function draw(p) {
+      var tone = colors.tone, i;
+      var depth = MIN_DEPTH + p * (MAX_DEPTH - MIN_DEPTH);
+      var active = p * (N_SUB - 1);
+      placeSources(p);
+
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+
+      // quadtree (newest level fades in)
+      var tree = quadtree(depth);
+      ctx.strokeStyle = ctx.fillStyle = colors.soft;
+      for (i = 1; i <= MAX_DEPTH; i++) {
+        var w = clamp(depth - (i - 1), 0, 1);
+        if (!w) continue;
+        ctx.globalAlpha = tone.tree * w;
+        ctx.stroke(tree[i]);
+      }
+
+      // point clusters, batched into one fill
+      var dots = new Path2D();
+      for (i = 0; i < points.length; i++) dots.rect(points[i].x - 1, points[i].y - 1, 2, 2);
+      ctx.globalAlpha = tone.pts;
+      ctx.fill(dots);
+
+      // active subdomains (at most two while crossing between them)
+      var strips = [];
+      for (i = 0; i < N_SUB; i++) {
+        var aw = weight(active, i);
+        if (aw) {
+          strips.push({
+            w: aw,
+            x0: Math.max(0, (i / N_SUB - SUB_OVERLAP) * W),
+            x1: Math.min(W, ((i + 1) / N_SUB + SUB_OVERLAP) * W),
+            path: new Path2D()
+          });
+        }
+      }
+
+      var path = contours(-p * LEVEL_STEP * 6, strips);
+      ctx.strokeStyle = colors.ink;
+      ctx.globalAlpha = tone.line;
+      ctx.stroke(path);
+
+      // dashed subdomain interfaces, accent-coloured around the active ones
+      ctx.setLineDash([3, 5]);
+      for (i = 0; i < N_SUB; i++) {
+        aw = weight(active, i);
+        var x0 = Math.round((i / N_SUB - SUB_OVERLAP) * W) + 0.5;
+        var x1 = Math.round(((i + 1) / N_SUB + SUB_OVERLAP) * W) + 0.5;
+        ctx.strokeStyle = aw ? colors.accent : colors.soft;
+        ctx.globalAlpha = Math.max(tone.line * 0.9, 0.7 * aw);
+        ctx.beginPath();
+        if (i > 0) { ctx.moveTo(x0, 0); ctx.lineTo(x0, H); }
+        if (i < N_SUB - 1) { ctx.moveTo(x1, 0); ctx.lineTo(x1, H); }
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = colors.accent;
+      for (i = 0; i < strips.length; i++) {
+        ctx.globalAlpha = tone.acc * strips[i].w;
+        ctx.stroke(strips[i].path);
+      }
+
+      // fade everything out behind the text column
+      if (colRight > colLeft) {
+        var fade = "rgba(0,0,0," + tone.fade + ")";
+        var e = Math.min(0.49, 140 / (colRight - colLeft + 160));
+        var g = ctx.createLinearGradient(colLeft - 80, 0, colRight + 80, 0);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(e, fade);
+        g.addColorStop(1 - e, fade);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = "source-over";
+      }
+
+      drawMatrix(p, depth, active);
+    }
+
+    /* --- scroll-driven loop: only runs while catching up --- */
+    var targetP = 0, curP = 0, rafId = 0;
+
+    function readScroll() {
+      targetP = clamp(window.scrollY / scrollMax, 0, 1);
+    }
+
+    function tick() {
+      rafId = 0;
+      curP = reduceMotion ? targetP : curP + (targetP - curP) * 0.14;
+      if (Math.abs(targetP - curP) < 0.0005) curP = targetP;
+      draw(curP);
+      if (curP !== targetP) rafId = requestAnimationFrame(tick);
+    }
+
+    function schedule() {
+      if (!rafId) rafId = requestAnimationFrame(tick);
+    }
+
+    function refresh() {
+      measure();
+      readScroll();
+      draw(curP);
+      schedule();
+    }
+
+    // matrix scroller: project the pointer onto the diagonal
+    var dragging = false;
+    function scrollFromPointer(e, behavior) {
+      var r = mCanvas.getBoundingClientRect();
+      var t = clamp((e.clientX - r.left + e.clientY - r.top) / (r.width + r.height), 0, 1);
+      window.scrollTo({ top: t * scrollMax, behavior: behavior });
+    }
+    mScroller.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      scrollFromPointer(e, reduceMotion ? "instant" : "smooth");
+      try { mScroller.setPointerCapture(e.pointerId); } catch (err) {}
     });
+    mScroller.addEventListener("pointermove", function (e) {
+      if (dragging) scrollFromPointer(e, "instant");
+    });
+    mScroller.addEventListener("pointerup", function () { dragging = false; });
+    mScroller.addEventListener("pointercancel", function () { dragging = false; });
 
-    (function blobTick() {
-      var lerpFactor = reduceMotion ? 1 : 0.18;
-      blobCurX += (blobTargetX - blobCurX) * lerpFactor;
-      blobCurY += (blobTargetY - blobCurY) * lerpFactor;
+    readColors();
+    measure();
+    readScroll();
+    curP = targetP;
+    draw(curP);
 
-      blobAnchors.forEach(function (a) {
-        var dx = a.x - blobCurX;
-        var dy = a.y - blobCurY;
-        var dist = Math.sqrt(dx * dx + dy * dy);
-        a.visible = dist > ANNULUS_INNER && dist < ANNULUS_OUTER;
-        a.rect.classList.toggle("is-near", a.visible);
-        a.label.classList.toggle("is-near", a.visible);
-        a.patch.classList.toggle("is-near", a.visible);
-      });
-
-      blobLinks.forEach(function (link) {
-        var show = link.a.visible && link.b.visible;
-        if (show) {
-          show = Math.hypot(link.a.x - link.b.x, link.a.y - link.b.y) < BOX_LINK_DIST;
-        }
-        link.el.classList.toggle("is-near", show);
-        if (show) {
-          link.el.setAttribute("x1", link.a.x);
-          link.el.setAttribute("y1", link.a.y);
-          link.el.setAttribute("x2", link.b.x);
-          link.el.setAttribute("y2", link.b.y);
-        }
-      });
-
-      requestAnimationFrame(blobTick);
-    })();
+    window.addEventListener("scroll", function () { readScroll(); schedule(); }, { passive: true });
+    window.addEventListener("resize", refresh);
+    // page height changes (fonts, images) without a window resize
+    if ("ResizeObserver" in window) new ResizeObserver(refresh).observe(document.body);
+    new MutationObserver(function () { readColors(); draw(curP); })
+      .observe(root, { attributes: true, attributeFilter: ["data-theme"] });
   }
 
   /* ---------------------------------------------------------
-     Ambient grid patches: a handful of spots that periodically
-     fade in and out on their own (CSS-driven, staggered),
-     independent of the cursor, so the grid isn't only ever tied
-     to the boxes.
-  --------------------------------------------------------- */
-  [
-    { xPct: 0.15, yPct: 0.22 },
-    { xPct: 0.85, yPct: 0.15 },
-    { xPct: 0.5, yPct: 0.45 },
-    { xPct: 0.1, yPct: 0.7 },
-    { xPct: 0.9, yPct: 0.6 },
-    { xPct: 0.4, yPct: 0.85 }
-  ].forEach(function (p, idx) {
-    var el = document.createElement("div");
-    el.className = "grid-patch is-ambient";
-    el.style.animationDelay = idx * 2.6 + "s";
-    document.body.appendChild(el);
-
-    function place() {
-      el.style.left = p.xPct * window.innerWidth + "px";
-      el.style.top = p.yPct * window.innerHeight + "px";
-    }
-    place();
-    window.addEventListener("resize", place);
-  });
-
-  /* ---------------------------------------------------------
-     Roll-reveal text links: wrap link text in duplicated
-     "roll-face" spans so CSS can slide the old copy up and
-     the new copy in underneath on hover.
+     Roll-reveal text links: duplicate each link's text so CSS
+     can slide the copy up into place on hover.
   --------------------------------------------------------- */
   document.querySelectorAll("a").forEach(function (a) {
-    if (a.children.length > 0) return;
-    var text = a.textContent;
-    if (!text || !text.trim()) return;
-
-    var roll = document.createElement("span");
-    roll.className = "roll";
-    var inner = document.createElement("span");
-    inner.className = "roll-inner";
-    var face1 = document.createElement("span");
-    face1.className = "roll-face";
-    face1.textContent = text;
-    var face2 = document.createElement("span");
-    face2.className = "roll-face";
-    face2.setAttribute("aria-hidden", "true");
-    face2.textContent = text;
-
-    inner.appendChild(face1);
-    inner.appendChild(face2);
-    roll.appendChild(inner);
-
-    a.textContent = "";
-    a.appendChild(roll);
+    var text = a.textContent.trim();
+    if (a.children.length || !text) return;
+    a.innerHTML = '<span class="roll"><span class="roll-inner">' +
+      '<span class="roll-face"></span><span class="roll-face" aria-hidden="true"></span></span></span>';
+    a.querySelectorAll(".roll-face").forEach(function (face) { face.textContent = text; });
   });
 
   /* ---------------------------------------------------------
-     KZCOMP gallery: grayscale reveal (the size increase on
-     hover/focus is handled purely in CSS)
+     KZCOMP gallery + lightbox. Each tile is just
+       <button class="gallery-item"><img src="images/NAME.jpg" alt="..."></button>
+     and the lightbox loads images/NAME-full.jpg (see make-images.py).
   --------------------------------------------------------- */
-  var galleryItems = document.querySelectorAll(".gallery-item");
-
-  galleryItems.forEach(function (item) {
-    var img = item.querySelector("img");
-    if (img) img.style.filter = "grayscale(var(--gray))";
-  });
-
-  /* ---------------------------------------------------------
-     KZCOMP gallery lightbox
-  --------------------------------------------------------- */
+  var gallery = document.querySelector(".kreedz-gallery");
+  var items = gallery ? [].slice.call(gallery.querySelectorAll(".gallery-item")) : [];
   var lightbox = document.getElementById("lightbox");
-  var lightboxImg = document.getElementById("lightboxImg");
-  var lightboxClose = document.getElementById("lightboxClose");
-  var lastFocused = null;
 
-  function openLightbox(src, alt) {
-    lastFocused = document.activeElement;
-    lightboxImg.src = src;
-    lightboxImg.alt = alt || "";
-    lightbox.classList.add("is-open");
-    lightbox.setAttribute("aria-hidden", "false");
-    lightboxClose.focus();
-    document.body.style.overflow = "hidden";
+  // staggered wipe-in when the gallery scrolls into view
+  if (gallery && !reduceMotion && "IntersectionObserver" in window) {
+    gallery.classList.add("is-pending");
+    var galleryObserver = new IntersectionObserver(function (entries) {
+      if (!entries[0].isIntersecting) return;
+      gallery.classList.remove("is-pending");
+      galleryObserver.disconnect();
+    }, { threshold: 0.15 });
+    galleryObserver.observe(gallery);
   }
 
-  function closeLightbox() {
-    lightbox.classList.remove("is-open");
-    lightbox.setAttribute("aria-hidden", "true");
-    lightboxImg.src = "";
-    document.body.style.overflow = "";
-    if (lastFocused) {
-      lastFocused.focus();
-    }
-  }
+  if (lightbox && items.length) {
+    var lbImg = document.getElementById("lightboxImg");
+    var lbCount = document.getElementById("lightboxCaption");
+    var lbClose = document.getElementById("lightboxClose");
+    var current = 0, lastFocused = null;
 
-  galleryItems.forEach(function (item) {
-    item.addEventListener("click", function () {
-      var full = item.getAttribute("data-full");
-      var img = item.querySelector("img");
-      openLightbox(full, img ? img.alt : "");
+    var pad2 = function (n) { return (n < 10 ? "0" : "") + n; };
+
+    var show = function (index) {
+      current = (index + items.length) % items.length;
+      var thumb = items[current].querySelector("img");
+      // show the tile image right away, swap in the large one once loaded
+      lbImg.src = thumb.currentSrc || thumb.src;
+      lbImg.alt = thumb.alt;
+      lbCount.textContent = pad2(current + 1) + " / " + pad2(items.length);
+      var full = new Image();
+      var wanted = current;
+      full.onload = function () {
+        if (wanted === current && lightbox.classList.contains("is-open")) lbImg.src = full.src;
+      };
+      full.src = thumb.getAttribute("src").replace(/\.jpg$/, "-full.jpg");
+    };
+
+    var open = function (index) {
+      lastFocused = document.activeElement;
+      lightbox.classList.add("is-open");
+      lightbox.setAttribute("aria-hidden", "false");
+      show(index);
+      lbClose.focus();
+      document.body.style.overflow = "hidden";
+    };
+
+    var close = function () {
+      lightbox.classList.remove("is-open");
+      lightbox.setAttribute("aria-hidden", "true");
+      lbImg.removeAttribute("src");
+      document.body.style.overflow = "";
+      if (lastFocused) lastFocused.focus();
+    };
+
+    items.forEach(function (item, i) {
+      item.style.setProperty("--i", i);
+      item.addEventListener("click", function () { open(i); });
     });
-  });
-
-  if (lightboxClose) {
-    lightboxClose.addEventListener("click", closeLightbox);
-  }
-
-  if (lightbox) {
+    lbClose.addEventListener("click", close);
+    document.getElementById("lightboxPrev").addEventListener("click", function () { show(current - 1); });
+    document.getElementById("lightboxNext").addEventListener("click", function () { show(current + 1); });
     lightbox.addEventListener("click", function (e) {
-      if (e.target === lightbox) {
-        closeLightbox();
-      }
+      if (e.target === lightbox) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (!lightbox.classList.contains("is-open")) return;
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") show(current - 1);
+      else if (e.key === "ArrowRight") show(current + 1);
     });
   }
-
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && lightbox.classList.contains("is-open")) {
-      closeLightbox();
-    }
-  });
 
   /* ---------------------------------------------------------
      Dark mode toggle
   --------------------------------------------------------- */
   var darkToggle = document.getElementById("darkModeToggle");
-  var darkToggleLabel = darkToggle
-    ? darkToggle.querySelector(".dark-toggle-label")
-    : null;
-
-  function syncDarkToggle() {
-    var isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    if (darkToggleLabel) darkToggleLabel.textContent = isDark ? "LIGHT MODE" : "DARK MODE";
-    if (darkToggle) darkToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
-  }
-
   if (darkToggle) {
-    syncDarkToggle();
+    var syncToggle = function () {
+      var dark = root.getAttribute("data-theme") === "dark";
+      darkToggle.firstElementChild.textContent = dark ? "LIGHT MODE" : "DARK MODE";
+      darkToggle.setAttribute("aria-pressed", dark);
+    };
+    syncToggle();
     darkToggle.addEventListener("click", function () {
-      var isDark = document.documentElement.getAttribute("data-theme") === "dark";
-      if (isDark) {
-        document.documentElement.removeAttribute("data-theme");
-        try { localStorage.setItem("theme", "light"); } catch (e) {}
-      } else {
-        document.documentElement.setAttribute("data-theme", "dark");
-        try { localStorage.setItem("theme", "dark"); } catch (e) {}
-      }
-      syncDarkToggle();
+      var dark = root.getAttribute("data-theme") !== "dark";
+      if (dark) root.setAttribute("data-theme", "dark");
+      else root.removeAttribute("data-theme");
+      try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
+      syncToggle();
     });
   }
 })();
