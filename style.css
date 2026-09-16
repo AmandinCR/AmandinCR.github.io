@@ -11,6 +11,7 @@
   --grid-line: rgba(26, 26, 26, 0.035);
   --sidebar-width: 230px;
   --content-max: 600px;
+  --topbar-height: 60px;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;}
 
 * {
@@ -44,12 +45,100 @@ a {
   text-decoration: none;
 }
 
-a:hover {
-  font-style: italic;
+@media (prefers-reduced-motion: no-preference) {
+  a { transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+}
+
+/* ---------------------------------------------------------
+   Roll-reveal text hover (link text rolls up to a duplicate
+   copy underneath, replacing the italic hover)
+--------------------------------------------------------- */
+.roll {
+  vertical-align: top;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.roll-inner {
+  display: block;
+  position: relative;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  a { transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+  .roll-inner { transition: transform 0.45s cubic-bezier(0.4, 0, 0.15, 1); }
+}
+
+.roll-face {
+  white-space: nowrap;
+  display: block;
+}
+
+.roll-face + .roll-face {
+  position: absolute;
+  top: 100%;
+  left: 0;
+}
+
+a:hover .roll-inner {
+  transform: translateY(-100%);
+}
+
+/* ---------------------------------------------------------
+   Top bar (fixed header): name centered, nav top-right
+--------------------------------------------------------- */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--topbar-height);
+  padding: 0.6rem 1.5rem;
+  background-color: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-name {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .top-bar nav.site-nav { gap: 0 0.7rem; }
+  .top-bar nav.site-nav a { font-size: 0.75rem; }
+  .site-name { font-size: 0.75rem; }
+}
+
+@media (max-width: 720px) {
+  .top-bar {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.6rem 1rem;
+  }
+  .site-name {
+    position: static;
+    transform: none;
+    order: -1;
+  }
+  .top-bar nav.site-nav {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .site-name { font-size: 0.65rem; }
+  .top-bar nav.site-nav { gap: 0 0.5rem; }
+  .top-bar nav.site-nav a { font-size: 0.65rem; }
 }
 
 /* ---------------------------------------------------------
@@ -58,7 +147,7 @@ a:hover {
 .layout {
   max-width: 900px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  padding: calc(2.5rem + var(--topbar-height)) 1.5rem 4rem;
   display: flex;
   flex-direction: column;
   gap: 2.5rem;
@@ -80,7 +169,7 @@ a:hover {
 
 @media (max-width: 720px) {
   .layout {
-    padding: 1.75rem 1.25rem 3rem;
+    padding: calc(1.75rem + var(--topbar-height) + 34px) 1.25rem 3rem;
     gap: 1.75rem;
   }
   .sidebar {
@@ -105,14 +194,6 @@ a:hover {
   filter: url(#motion-blur);
 }
 
-.avatar:hover {
-  transform: scale(1.06);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .avatar { transition: transform 0.2s ease; }
-}
-
 .profile-text {
   display: flex;
   flex-direction: column;
@@ -125,15 +206,8 @@ a:hover {
   gap: 0.15rem;
 }
 
-.site-name {
-  font-size: 2rem;
-  font-weight: 600;
-  line-height: 1.1;
-  margin: 0;
-}
-
 .site-tagline {
-  font-size: 0.78rem;
+  font-size: 1.05rem;
   color: var(--ink-soft);
   margin: 0;
 }
@@ -336,6 +410,197 @@ a.entry-role:hover {
 
 @media (max-width: 480px) {
   .entry-role { margin-left: 0; }
+}
+
+/* ---------------------------------------------------------
+   KZCOMP gallery
+--------------------------------------------------------- */
+.kreedz-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0;
+  margin-top: 1.5rem;
+  border: 1px solid var(--rule);
+}
+
+.gallery-item {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gallery-item { transition: transform 0.3s ease; }
+}
+
+.gallery-item:hover,
+.gallery-item:focus-visible {
+  transform: scale(1.2);
+  z-index: 5;
+}
+
+.gallery-item img {
+  --gray: 35%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-item:hover img,
+.gallery-item:focus-visible img {
+  --gray: 0%;
+}
+
+.gallery-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------
+   Lightbox
+--------------------------------------------------------- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 8, 0.92);
+  padding: 3rem 1.5rem;
+}
+
+.lightbox.is-open {
+  display: flex;
+}
+
+.lightbox-img {
+  max-width: min(90vw, 1100px);
+  max-height: 85vh;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--rule);
+  object-fit: contain;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--paper);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+.lightbox-close:hover {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------
+   Barcode scroll indicator
+--------------------------------------------------------- */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+.barcode-scrollbar {
+  position: fixed;
+  top: 50%;
+  right: calc(50vw - 450px);
+  transform: translateY(-50%);
+  width: 15px;
+  height: 130px;
+  z-index: 9999;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+@media (max-width: 1150px) {
+  .barcode-scrollbar { display: none; }
+}
+
+.barcode-bars {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 320px;
+  will-change: transform;
+  background-repeat: repeat-y;
+  background-size: 100% 150px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--ink) 0px, var(--ink) 2px,
+    transparent 2px, transparent 4px,
+    var(--ink) 4px, var(--ink) 5px,
+    transparent 5px, transparent 9px,
+    var(--ink) 9px, var(--ink) 13px,
+    transparent 13px, transparent 15px,
+    var(--ink) 15px, var(--ink) 16px,
+    transparent 16px, transparent 21px,
+    var(--ink) 21px, var(--ink) 24px,
+    transparent 24px, transparent 26px,
+    var(--ink) 26px, var(--ink) 27px,
+    transparent 27px, transparent 33px,
+    var(--ink) 33px, var(--ink) 35px,
+    transparent 35px, transparent 37px,
+    var(--ink) 37px, var(--ink) 42px,
+    transparent 42px, transparent 45px,
+    var(--ink) 45px, var(--ink) 46px,
+    transparent 46px, transparent 52px,
+    var(--ink) 52px, var(--ink) 56px,
+    transparent 56px, transparent 58px,
+    var(--ink) 58px, var(--ink) 59px,
+    transparent 59px, transparent 64px,
+    var(--ink) 64px, var(--ink) 67px,
+    transparent 67px, transparent 69px,
+    var(--ink) 69px, var(--ink) 73px,
+    transparent 73px, transparent 76px,
+    var(--ink) 76px, var(--ink) 77px,
+    transparent 77px, transparent 83px,
+    var(--ink) 83px, var(--ink) 86px,
+    transparent 86px, transparent 88px,
+    var(--ink) 88px, var(--ink) 89px,
+    transparent 89px, transparent 95px,
+    var(--ink) 95px, var(--ink) 99px,
+    transparent 99px, transparent 101px,
+    var(--ink) 101px, var(--ink) 105px,
+    transparent 105px, transparent 108px,
+    var(--ink) 108px, var(--ink) 109px,
+    transparent 109px, transparent 115px,
+    var(--ink) 115px, var(--ink) 118px,
+    transparent 118px, transparent 120px,
+    var(--ink) 120px, var(--ink) 124px,
+    transparent 124px, transparent 127px,
+    var(--ink) 127px, var(--ink) 130px,
+    transparent 130px, transparent 134px,
+    var(--ink) 134px, var(--ink) 136px,
+    transparent 136px, transparent 141px,
+    var(--ink) 141px, var(--ink) 145px,
+    transparent 145px, transparent 150px
+  );
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .barcode-bars { transition: transform 0.25s ease-out; }
 }
 
 /* ---------------------------------------------------------

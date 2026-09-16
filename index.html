@@ -23,19 +23,38 @@
     </feMerge>
   </filter>
 </svg>
+
+<!-- Fixed header bar: name centered, nav top-right, stays on top while scrolling -->
+<header class="top-bar" id="topBar">
+  <nav class="site-nav">
+    <a href="#bio">BIO</a>
+    <a href="#talks">TALKS</a>
+    <a href="#publications">PUBLICATIONS</a>
+    <a href="#teaching">TEACHING</a>
+  </nav>
+  <p class="site-name">AMANDIN CHYBA</p>
+  <nav class="site-nav">
+    <a href="#kreedz">KZCOMP</a>
+  </nav>
+</header>
+
+<!-- Vertical barcode acting as a stylized scroll indicator -->
+<div class="barcode-scrollbar" id="barcodeScrollbar" role="scrollbar" aria-label="Scroll position" aria-hidden="true">
+  <div class="barcode-bars"></div>
+</div>
+
 <div class="layout">
 
   <aside class="sidebar">
     <img class="avatar" src="profile2.JPG" alt="Amandin Chyba">
     <div class="profile-text">
       <div class="identity">
-        <p class="site-name">Amandin Chyba</p>
-        <p class="site-tagline">PhD candidate (Mathematics) and co-owner of kzcomp</p>
+        <p class="site-tagline">PhD candidate (Mathematics) and co-founder of <a href="https://kzcomp.com">kzcomp.com</a></p>
       </div>
       <ul class="meta-list">
-        <li>Email: atc9782[at]nyu[dot]edu</li>
-        <li>Office: New York University, 1007 WWH</li>
-        <li>Advisor: <a href="https://cims.nyu.edu/~oneil/">Mike O'Neil</a></li>
+        <li>EMAIL: atc9782 [at] nyu [dot] edu</li>
+        <li>OFFICE: New York University, 1007 WWH</li>
+        <li>ADVISOR: <a href="https://cims.nyu.edu/~oneil/">Mike O'Neil</a></li>
       </ul>
     </div>
 
@@ -45,20 +64,12 @@
       <span>Domain Decomposition Methods</span>
       <span>Electromagnetics</span>
     </div>
-
-    <nav class="site-nav">
-      <a href="#bio">BIO</a>
-      <a href="#talks">TALKS</a>
-      <a href="#publications">PUBLICATIONS</a>
-      <a href="#teaching">TEACHING</a>
-      <a href="#kreedz">KZCOMP</a>
-    </nav>
   </aside>
 
   <main class="main-content">
 
     <section id="bio">
-      <h2 class="section-title">Bio</h2>
+      <h2 class="section-title">BIO</h2>
       <ul class="entry-list">
         <li class="entry">
           <span class="entry-year">Present</span>
@@ -74,7 +85,7 @@
     </section>
 
      <section id="talks">
-      <h2 class="section-title">Talks</h2>
+      <h2 class="section-title">TALKS</h2>
       <ul class="entry-list">
         <li class="entry">
           <span class="entry-year">Aug 2026</span>
@@ -115,7 +126,7 @@
     </section>
     
     <section id="publications">
-      <h2 class="section-title">Publications</h2>
+      <h2 class="section-title">PUBLICATIONS</h2>
       <ul class="entry-list">
         <li class="entry">
           <span class="entry-year">2026</span>
@@ -140,7 +151,7 @@
 
    
     <section id="teaching">
-      <h2 class="section-title">Teaching</h2>
+      <h2 class="section-title">TEACHING</h2>
       <ul class="entry-list">
         <li class="entry">
           <span class="entry-year">Fa 2026</span>
@@ -162,16 +173,41 @@
 
     <section id="kreedz">
       <h2 class="section-title">KZCOMP</h2>
-      <a href="https://kzcomp.com" class="kreedz-badge-link">
-        <img src="kzcomp.png" alt="kzcomp.com" class="kreedz-badge">
-      </a>
       <p class="kreedz-description">
         Since 2023, I have co-owned <a href="https://kzcomp.com">kzcomp.com</a>, a platform for hosting Kreedz tournaments.
       </p>
+
+      <div class="kreedz-gallery">
+        <button class="gallery-item" data-full="kzcomp1.png" aria-label="Open graphic 1">
+          <img src="kzcomp1.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
+        </button>
+        <button class="gallery-item" data-full="kzcomp2.png" aria-label="Open graphic 2">
+          <img src="kzcomp2.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
+        </button>
+        <button class="gallery-item" data-full="kzcomp3.png" aria-label="Open graphic 3">
+          <img src="kzcomp3.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
+        </button>
+        <button class="gallery-item" data-full="kzcomp4.png" aria-label="Open graphic 4">
+          <img src="kzcomp4.png" alt="KZCOMP promotional graphic" loading="lazy" decoding="async">
+        </button>
+        <button class="gallery-item" data-full="kzcomp5.jpg" aria-label="Open graphic 5">
+          <img src="kzcomp5.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async">
+        </button>
+        <button class="gallery-item" data-full="kzcomp6.jpg" aria-label="Open graphic 6">
+          <img src="kzcomp6.jpg" alt="KZCOMP tournament screenshot" loading="lazy" decoding="async">
+        </button>
+      </div>
     </section>
 
   </main>
 
 </div>
+
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+  <img class="lightbox-img" id="lightboxImg" src="" alt="">
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
