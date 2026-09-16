@@ -34,6 +34,7 @@ html {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
 body {
@@ -61,10 +62,7 @@ body {
 a {
   color: var(--accent);
   text-decoration: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a { transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 /* ---------------------------------------------------------
@@ -80,10 +78,7 @@ a {
 .roll-inner {
   display: block;
   position: relative;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .roll-inner { transition: transform 0.45s cubic-bezier(0.4, 0, 0.15, 1); }
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.15, 1);
 }
 
 .roll-face {
@@ -194,20 +189,17 @@ a:hover .roll-inner {
     align-items: flex-start;
     gap: 1rem;
   }
-  .avatar-frame { margin-left: 7px; }
 }
 
 /* ---------------------------------------------------------
    Sidebar
 --------------------------------------------------------- */
-/* Profile picture: square photo with corner registration marks,
-   fading in on page load. */
+/* Profile picture with corner registration marks, fading in on load */
 .avatar-frame {
   position: relative;
   flex-shrink: 0;
   width: 128px;
   height: 128px;
-  margin-left: 1.5rem;
 }
 
 .avatar-frame::after {
@@ -233,27 +225,17 @@ a:hover .roll-inner {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  animation: fade-in 1.1s ease-out both;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .avatar { animation: avatar-fade-in 1.1s ease-out both; }
-}
-
-@keyframes avatar-fade-in {
+@keyframes fade-in {
   from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 .profile-text {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-.identity {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
 }
 
 .site-tagline {
@@ -300,6 +282,7 @@ a:hover .roll-inner {
   border-radius: 0;
   padding: 0.18rem 0.45rem;
   cursor: default;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .interests span:hover {
@@ -307,13 +290,6 @@ a:hover .roll-inner {
   border-color: var(--accent);
   background-color: rgba(var(--accent-rgb), 0.1);
   box-shadow: 0 3px 0 rgba(var(--accent-rgb), 0.25);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .interests span {
-    transition: transform 0.2s ease, border-color 0.2s ease,
-      background-color 0.2s ease, box-shadow 0.2s ease;
-  }
 }
 
 nav.site-nav {
@@ -389,15 +365,11 @@ p {
 }
 
 .entry:hover {
-  background-color: rgba(var(--accent-rgb), 0.14);
+  background-color: rgba(var(--accent-rgb), 0.24);
 }
 
 ::selection {
   background-color: rgba(var(--accent-rgb), 0.3);
-}
-
-@media (max-width: 480px) {
-  .entry { flex-direction: column; gap: 0.1rem; }
 }
 
 .entry-year {
@@ -451,12 +423,14 @@ a.entry-role {
 }
 
 a.entry-role:hover {
-  color: var(--accent);
   border-color: var(--accent);
 }
 
 @media (max-width: 480px) {
+  .entry { flex-direction: column; gap: 0.1rem; }
+  .entry-year { flex: none; }
   .entry-role { margin-left: 0; }
+  section { margin-bottom: 1.25rem; }
 }
 
 /* ---------------------------------------------------------
@@ -504,6 +478,8 @@ a.entry-role:hover {
   object-fit: cover;
   display: block;
   filter: grayscale(1) contrast(1.08);
+  will-change: transform; /* stays on one GPU layer, so the zoom doesn't jitter */
+  transition: filter 0.5s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /* accent outline, shown on hover */
@@ -514,6 +490,7 @@ a.entry-role:hover {
   pointer-events: none;
   opacity: 0;
   box-shadow: inset 0 0 0 2px var(--accent);
+  transition: opacity 0.3s ease;
 }
 
 /* index chip: 01, 02, ... numbered automatically */
@@ -530,6 +507,7 @@ a.entry-role:hover {
   letter-spacing: 0.04em;
   color: var(--ink);
   background-color: var(--paper);
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .gallery-item:hover img,
@@ -554,28 +532,13 @@ a.entry-role:hover {
   .gallery-item img { filter: none; }
 }
 
-/* mouse devices: keep each image on its own GPU layer so the hover
-   zoom doesn't jitter when a layer is created/dropped mid-animation */
-@media (hover: hover) {
-  .gallery-item img {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    will-change: transform;
-  }
+/* staggered wipe-in when the gallery scrolls into view (script.js) */
+.gallery-item {
+  transition: clip-path 0.8s cubic-bezier(0.7, 0, 0.2, 1) calc(var(--i, 0) * 80ms);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .gallery-item img { transition: filter 0.5s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
-  .gallery-item::after { transition: opacity 0.3s ease; }
-  .gallery-item::before { transition: color 0.2s ease, background-color 0.2s ease; }
-
-  /* staggered wipe-in when the gallery scrolls into view */
-  .gallery-item {
-    transition: clip-path 0.8s cubic-bezier(0.7, 0, 0.2, 1) calc(var(--i, 0) * 80ms);
-  }
-  .kreedz-gallery.is-pending .gallery-item {
-    clip-path: inset(0 100% 0 0);
-  }
+.kreedz-gallery.is-pending .gallery-item {
+  clip-path: inset(0 100% 0 0);
 }
 
 .gallery-item:focus-visible {
@@ -714,8 +677,7 @@ html::-webkit-scrollbar {
 }
 
 @media (max-width: 480px) {
-  .matrix-canvas { width: 72px; height: 72px; }
-  .matrix-caption-eq { display: none; }
+  .matrix-scroller { display: none; }
 }
 
 /* ---------------------------------------------------------
@@ -739,14 +701,6 @@ html::-webkit-scrollbar {
 .dark-toggle:hover {
   color: var(--ink);
   border-color: var(--ink-soft);
-}
-
-.dark-toggle-label::before {
-  content: "[ ";
-}
-
-.dark-toggle-label::after {
-  content: " ]";
 }
 
 /* ---------------------------------------------------------

@@ -25,7 +25,7 @@
 <canvas class="bg-field" id="bgField" aria-hidden="true"></canvas>
 
 <!-- Fixed header bar: name centered, nav top-right, stays on top while scrolling -->
-<header class="top-bar" id="topBar">
+<header class="top-bar">
   <nav class="site-nav">
     <a href="#bio">BIO</a>
     <a href="#talks">TALKS</a>
@@ -44,7 +44,7 @@
 <div class="matrix-scroller" id="matrixScroller" aria-hidden="true">
   <canvas class="matrix-canvas" id="matrixCanvas"></canvas>
   <p class="matrix-caption">
-    <span class="matrix-caption-eq">A = diag(A₁…A₄)</span>
+    <span>A = diag(A₁…A₄)</span>
     <span id="matrixLabel">SUBDOMAIN Ω1/4</span>
   </p>
 </div>
@@ -56,9 +56,7 @@
       <img class="avatar" src="images/profile.jpg" alt="Amandin Chyba" width="256" height="256">
     </div>
     <div class="profile-text">
-      <div class="identity">
-        <p class="site-tagline">PhD candidate (Mathematics) and co-founder of <a href="https://kzcomp.com">kzcomp.com</a></p>
-      </div>
+      <p class="site-tagline">PhD candidate (Mathematics) and co-founder of <a href="https://kzcomp.com">kzcomp.com</a></p>
       <ul class="meta-list">
         <li>EMAIL: atc9782 [at] nyu [dot] edu</li>
         <li>OFFICE: New York University, 1007 WWH</li>
@@ -211,9 +209,7 @@
   <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Next image">&rarr;</button>
 </div>
 
-<button class="dark-toggle" id="darkModeToggle" aria-pressed="false" aria-label="Toggle dark mode">
-  <span class="dark-toggle-label">DARK MODE</span>
-</button>
+<button class="dark-toggle" id="darkModeToggle" aria-label="Toggle dark mode">[ DARK MODE ]</button>
 
 <script src="script.js"></script>
 </body>

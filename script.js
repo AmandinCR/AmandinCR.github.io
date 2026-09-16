@@ -77,8 +77,8 @@
       colors.accent = cs.getPropertyValue("--accent").trim();
       // light mode needs more ink to read against the cream paper
       colors.tone = dark
-        ? { line: 0.14, tree: 0.2, pts: 0.35, acc: 0.42, fade: 0.82, matrix: 0.6 }
-        : { line: 0.3, tree: 0.4, pts: 0.55, acc: 0.62, fade: 0.78, matrix: 0.8 };
+        ? { line: 0.14, tree: 0.2, acc: 0.42, fade: 0.82, matrix: 0.6 }
+        : { line: 0.3, tree: 0.4, acc: 0.62, fade: 0.78, matrix: 0.8 };
     }
 
     // Canvas sizes follow their CSS boxes. Reallocating a canvas is
@@ -205,60 +205,29 @@
       return Math.max(0, 1 - Math.abs(active - i));
     }
 
-    // block-diagonal matrix with hierarchical (HODLR-like) blocks
+    // block-diagonal matrix; each diagonal block splits further as the tree deepens
     function drawMatrix(p, depth, active) {
-      var g = mctx, M = M_SIZE - 1, bs = M / N_SUB, i;
-      var hier = Math.max(0, depth - MIN_DEPTH);
-      var base = colors.tone.matrix;
+      var g = mctx, M = M_SIZE - 1, bs = M / N_SUB, i, l, k;
+      var levels = Math.min(4, Math.floor(depth - MIN_DEPTH));
       g.setTransform(DPR, 0, 0, DPR, 0, 0);
       g.clearRect(0, 0, M_SIZE, M_SIZE);
       g.lineWidth = 1;
-      g.strokeStyle = g.fillStyle = colors.soft;
-      g.globalAlpha = base;
+      g.globalAlpha = colors.tone.matrix;
+      g.strokeStyle = colors.soft;
       g.strokeRect(0.5, 0.5, M, M);
-
-      // coupling between neighbouring subdomains (from the overlap)
-      g.globalAlpha = base * 0.35;
-      var o = bs * 0.22;
-      for (i = 1; i < N_SUB; i++) {
-        g.fillRect(0.5 + i * bs, 0.5 + i * bs - o, o, o);
-        g.fillRect(0.5 + i * bs - o, 0.5 + i * bs, o, o);
+      for (i = 0; i < N_SUB; i++) {
+        for (l = 0; l <= levels; l++) {
+          var s = bs / (1 << l);
+          for (k = 0; k < 1 << l; k++) g.strokeRect(0.5 + i * bs + k * s, 0.5 + i * bs + k * s, s, s);
+        }
       }
 
-      function block(x, y, s, lvl) {
-        var w = clamp(hier - lvl, 0, 1);
-        if (lvl >= 4 || w === 0) {
-          g.globalAlpha = base * 0.45;
-          g.fillRect(x, y, s, s);
-          return;
-        }
-        // off-diagonal blocks are low rank: outline plus a thin U V^T strip
-        var h = s / 2, r = Math.max(1, h * 0.12);
-        g.globalAlpha = base * 0.6 * w;
-        g.strokeRect(x + h, y, h, h);
-        g.strokeRect(x, y + h, h, h);
-        g.globalAlpha = base * 0.45 * w;
-        g.fillRect(x + h, y, r, h);
-        g.fillRect(x + h, y, h, r);
-        g.fillRect(x, y + h, r, h);
-        g.fillRect(x, y + h, h, r);
-        if (w < 1) {
-          g.globalAlpha = base * 0.45 * (1 - w);
-          g.fillRect(x, y, s, s);
-        }
-        block(x, y, h, lvl + 1);
-        block(x + h, y + h, h, lvl + 1);
-      }
-      for (i = 0; i < N_SUB; i++) block(0.5 + i * bs, 0.5 + i * bs, bs, 0);
-
-      g.strokeStyle = g.fillStyle = colors.accent;
+      g.fillStyle = g.strokeStyle = colors.accent;
       for (i = 0; i < N_SUB; i++) {
         var aw = weight(active, i);
         if (!aw) continue;
-        g.globalAlpha = 0.18 * aw;
+        g.globalAlpha = 0.25 * aw;
         g.fillRect(0.5 + i * bs, 0.5 + i * bs, bs, bs);
-        g.globalAlpha = 0.9 * aw;
-        g.strokeRect(0.5 + i * bs, 0.5 + i * bs, bs, bs);
       }
 
       // scroll position: current row / column of the matrix
@@ -271,7 +240,7 @@
       g.globalAlpha = 1;
       g.fillRect(t - 2.5, t - 2.5, 5, 5);
 
-      var label = "SUBDOMAIN Ω" + Math.min(N_SUB, Math.round(active) + 1) + "/" + N_SUB;
+      var label = "SUBDOMAIN \u03a9" + Math.min(N_SUB, Math.round(active) + 1) + "/" + N_SUB;
       if (mLabel.textContent !== label) mLabel.textContent = label;
     }
 
@@ -287,19 +256,13 @@
 
       // quadtree (newest level fades in)
       var tree = quadtree(depth);
-      ctx.strokeStyle = ctx.fillStyle = colors.soft;
+      ctx.strokeStyle = colors.soft;
       for (i = 1; i <= MAX_DEPTH; i++) {
         var w = clamp(depth - (i - 1), 0, 1);
         if (!w) continue;
         ctx.globalAlpha = tone.tree * w;
         ctx.stroke(tree[i]);
       }
-
-      // point clusters, batched into one fill
-      var dots = new Path2D();
-      for (i = 0; i < points.length; i++) dots.rect(points[i].x - 1, points[i].y - 1, 2, 2);
-      ctx.globalAlpha = tone.pts;
-      ctx.fill(dots);
 
       // active subdomains (at most two while crossing between them)
       var strips = [];
@@ -431,9 +394,8 @@
   });
 
   /* ---------------------------------------------------------
-     KZCOMP gallery + lightbox. Each tile is just
-       <button class="gallery-item"><img src="images/NAME.jpg" alt="..."></button>
-     and the lightbox loads images/NAME-full.jpg (see make-images.py).
+     KZCOMP gallery + lightbox. The lightbox shows images/NAME-full.jpg
+     for a tile image images/NAME.jpg (see make-images.py).
   --------------------------------------------------------- */
   var gallery = document.querySelector(".kreedz-gallery");
   var items = gallery ? [].slice.call(gallery.querySelectorAll(".gallery-item")) : [];
@@ -461,16 +423,9 @@
     var show = function (index) {
       current = (index + items.length) % items.length;
       var thumb = items[current].querySelector("img");
-      // show the tile image right away, swap in the large one once loaded
-      lbImg.src = thumb.currentSrc || thumb.src;
+      lbImg.src = thumb.getAttribute("src").replace(/\.jpg$/, "-full.jpg");
       lbImg.alt = thumb.alt;
       lbCount.textContent = pad2(current + 1) + " / " + pad2(items.length);
-      var full = new Image();
-      var wanted = current;
-      full.onload = function () {
-        if (wanted === current && lightbox.classList.contains("is-open")) lbImg.src = full.src;
-      };
-      full.src = thumb.getAttribute("src").replace(/\.jpg$/, "-full.jpg");
     };
 
     var open = function (index) {
@@ -512,19 +467,15 @@
      Dark mode toggle
   --------------------------------------------------------- */
   var darkToggle = document.getElementById("darkModeToggle");
-  if (darkToggle) {
-    var syncToggle = function () {
-      var dark = root.getAttribute("data-theme") === "dark";
-      darkToggle.firstElementChild.textContent = dark ? "LIGHT MODE" : "DARK MODE";
-      darkToggle.setAttribute("aria-pressed", dark);
-    };
+  var syncToggle = function () {
+    darkToggle.textContent = root.getAttribute("data-theme") === "dark" ? "[ LIGHT MODE ]" : "[ DARK MODE ]";
+  };
+  syncToggle();
+  darkToggle.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") !== "dark";
+    if (dark) root.setAttribute("data-theme", "dark");
+    else root.removeAttribute("data-theme");
+    try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
     syncToggle();
-    darkToggle.addEventListener("click", function () {
-      var dark = root.getAttribute("data-theme") !== "dark";
-      if (dark) root.setAttribute("data-theme", "dark");
-      else root.removeAttribute("data-theme");
-      try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
-      syncToggle();
-    });
-  }
+  });
 })();
