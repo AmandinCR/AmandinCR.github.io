@@ -19,8 +19,8 @@
   function updateBarcodeBars() {
     var ratio = (window.scrollY || window.pageYOffset) / scrollableHeight();
     ratio = Math.min(Math.max(ratio, 0), 1);
-    var travel = bars.offsetHeight - barcode.clientHeight;
-    bars.style.transform = "translateY(" + (-ratio * travel) + "px)";
+    var travel = bars.offsetWidth - barcode.clientWidth;
+    bars.style.transform = "translateX(" + (-ratio * travel) + "px)";
   }
 
   if (barcode && bars) {
@@ -30,7 +30,7 @@
 
     barcode.addEventListener("click", function (e) {
       var rect = barcode.getBoundingClientRect();
-      var ratio = (e.clientY - rect.top) / rect.height;
+      var ratio = (e.clientX - rect.left) / rect.width;
       var behavior = reduceMotion ? "auto" : "smooth";
       window.scrollTo({ top: ratio * scrollableHeight(), behavior: behavior });
     });
@@ -198,4 +198,33 @@
       closeLightbox();
     }
   });
+
+  /* ---------------------------------------------------------
+     Dark mode toggle
+  --------------------------------------------------------- */
+  var darkToggle = document.getElementById("darkModeToggle");
+  var darkToggleLabel = darkToggle
+    ? darkToggle.querySelector(".dark-toggle-label")
+    : null;
+
+  function syncDarkToggle() {
+    var isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    if (darkToggleLabel) darkToggleLabel.textContent = isDark ? "LIGHT MODE" : "DARK MODE";
+    if (darkToggle) darkToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+  }
+
+  if (darkToggle) {
+    syncDarkToggle();
+    darkToggle.addEventListener("click", function () {
+      var isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      if (isDark) {
+        document.documentElement.removeAttribute("data-theme");
+        try { localStorage.setItem("theme", "light"); } catch (e) {}
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+        try { localStorage.setItem("theme", "dark"); } catch (e) {}
+      }
+      syncDarkToggle();
+    });
+  }
 })();

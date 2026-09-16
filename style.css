@@ -3,16 +3,29 @@
 --------------------------------------------------------- */
 :root {
   --paper: #FCFFEB;
+  --paper-rgb: 252, 255, 235;
   --ink: #1a1a1a;
   --ink-soft: #55534d;
   --rule: #d8d5cd;
   --accent: #C57B57;
   --accent-soft: #C57B57;
-  --grid-line: rgba(26, 26, 26, 0.035);
+  --grid-line: rgba(26, 26, 26, 0.07);
   --sidebar-width: 230px;
   --content-max: 600px;
   --topbar-height: 60px;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;}
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  --paper: #15171b;
+  --paper-rgb: 21, 23, 27;
+  --ink: #ececE4;
+  --ink-soft: #a5a196;
+  --rule: #34372f;
+  --accent: #e6996b;
+  --accent-soft: #e6996b;
+  --grid-line: rgba(255, 255, 255, 0.05);
+}
 
 * {
   box-sizing: border-box;
@@ -38,6 +51,33 @@ body {
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Animated curvy "stream" lines: a transform-animated layer (not
+   background-position) so the drift is compositor-smooth, not choppy. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -300px;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+  background-repeat: repeat;
+  background-size: 300px 300px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cpath d='M0,60 C50,60 100,10 150,10 C200,10 250,60 300,60' fill='none' stroke='%23C57B57' stroke-opacity='0.28' stroke-width='3'/%3E%3Cpath d='M0,170 C25,170 50,140 75,140 C100,140 125,170 150,170 C175,170 200,140 225,140 C250,140 275,170 300,170' fill='none' stroke='%231a1a1a' stroke-opacity='0.14' stroke-width='2'/%3E%3Cpath d='M0,250 C17,250 33,230 50,230 C67,230 83,250 100,250 C117,250 133,230 150,230 C167,230 183,250 200,250 C217,250 233,230 250,230 C267,230 283,250 300,250' fill='none' stroke='%23C57B57' stroke-opacity='0.2' stroke-width='2'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] body::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cpath d='M0,60 C50,60 100,10 150,10 C200,10 250,60 300,60' fill='none' stroke='%23e6996b' stroke-opacity='0.22' stroke-width='3'/%3E%3Cpath d='M0,170 C25,170 50,140 75,140 C100,140 125,170 150,170 C175,170 200,140 225,140 C250,140 275,170 300,170' fill='none' stroke='%23ffffff' stroke-opacity='0.09' stroke-width='2'/%3E%3Cpath d='M0,250 C17,250 33,230 50,230 C67,230 83,250 100,250 C117,250 133,230 150,230 C167,230 183,250 200,250 C217,250 233,230 250,230 C267,230 283,250 300,250' fill='none' stroke='%23e6996b' stroke-opacity='0.15' stroke-width='2'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body::after { animation: stream-drift 18s linear infinite; }
+}
+
+@keyframes stream-drift {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(-300px, -300px); }
 }
 
 a {
@@ -522,31 +562,33 @@ html::-webkit-scrollbar {
 
 .barcode-scrollbar {
   position: fixed;
-  top: 50%;
-  right: calc(50vw - 450px);
-  transform: translateY(-50%);
-  width: 15px;
-  height: 130px;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 30px;
   z-index: 9999;
   cursor: pointer;
   overflow: hidden;
+  border: 1px solid var(--rule);
+  background-color: var(--paper);
 }
 
-@media (max-width: 1150px) {
-  .barcode-scrollbar { display: none; }
+@media (max-width: 480px) {
+  .barcode-scrollbar { width: 150px; }
 }
 
 .barcode-bars {
   position: absolute;
   left: 0;
   top: 0;
-  width: 100%;
-  height: 320px;
+  width: 600px;
+  height: 100%;
   will-change: transform;
-  background-repeat: repeat-y;
-  background-size: 100% 150px;
+  background-repeat: repeat-x;
+  background-size: 150px 100%;
   background-image: repeating-linear-gradient(
-    to bottom,
+    to right,
     var(--ink) 0px, var(--ink) 2px,
     transparent 2px, transparent 4px,
     var(--ink) 4px, var(--ink) 5px,
@@ -601,6 +643,39 @@ html::-webkit-scrollbar {
 
 @media (prefers-reduced-motion: no-preference) {
   .barcode-bars { transition: transform 0.25s ease-out; }
+}
+
+/* ---------------------------------------------------------
+   Dark mode toggle
+--------------------------------------------------------- */
+.dark-toggle {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 10001;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  background-color: rgba(var(--paper-rgb), 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--rule);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.dark-toggle:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.dark-toggle-label::before {
+  content: "[ ";
+}
+
+.dark-toggle-label::after {
+  content: " ]";
 }
 
 /* ---------------------------------------------------------

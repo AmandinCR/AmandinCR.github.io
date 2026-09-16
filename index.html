@@ -4,11 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Amandin Chyba</title>
-<meta name="description" content="Jane Doe — PhD student in numerical analysis at NYU.">
+<meta name="description" content="Amandin Chyba — PhD student at NYU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+(function () {
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <!-- Motion-blur trail for the profile picture (used by .avatar in style.css) -->
@@ -174,7 +183,7 @@
     <section id="kreedz">
       <h2 class="section-title">KZCOMP</h2>
       <p class="kreedz-description">
-        Since 2023, I have co-owned <a href="https://kzcomp.com">kzcomp.com</a>, a platform for hosting Kreedz tournaments.
+        In 2023 I founded <a href="https://kzcomp.com">kzcomp.com</a>, a platform for hosting Kreedz tournaments.
       </p>
 
       <div class="kreedz-gallery">
@@ -207,6 +216,10 @@
   <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
   <img class="lightbox-img" id="lightboxImg" src="" alt="">
 </div>
+
+<button class="dark-toggle" id="darkModeToggle" aria-pressed="false" aria-label="Toggle dark mode">
+  <span class="dark-toggle-label">DARK MODE</span>
+</button>
 
 <script src="script.js"></script>
 </body>
