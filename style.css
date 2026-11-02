@@ -194,36 +194,11 @@ a:hover .roll-inner {
 /* ---------------------------------------------------------
    Sidebar
 --------------------------------------------------------- */
-/* Profile picture with corner registration marks, fading in on load */
-.avatar-frame {
-  position: relative;
+.avatar {
+  display: block;
   flex-shrink: 0;
   width: 128px;
   height: 128px;
-}
-
-.avatar-frame::after {
-  content: "";
-  position: absolute;
-  inset: -7px;
-  pointer-events: none;
-  --m: var(--accent);
-  background:
-    linear-gradient(var(--m), var(--m)) top left / 12px 1px,
-    linear-gradient(var(--m), var(--m)) top left / 1px 12px,
-    linear-gradient(var(--m), var(--m)) top right / 12px 1px,
-    linear-gradient(var(--m), var(--m)) top right / 1px 12px,
-    linear-gradient(var(--m), var(--m)) bottom left / 12px 1px,
-    linear-gradient(var(--m), var(--m)) bottom left / 1px 12px,
-    linear-gradient(var(--m), var(--m)) bottom right / 12px 1px,
-    linear-gradient(var(--m), var(--m)) bottom right / 1px 12px;
-  background-repeat: no-repeat;
-}
-
-.avatar {
-  display: block;
-  width: 100%;
-  height: 100%;
   object-fit: cover;
   animation: fade-in 1.1s ease-out both;
 }
@@ -376,11 +351,6 @@ p {
   flex: 0 0 4rem;
   color: var(--ink-soft);
   font-size: 0.72rem;
-  transition: padding-left 0.15s ease;
-}
-
-.entry:hover .entry-year {
-  padding-left: 0.4rem;
 }
 
 .entry-title {
@@ -628,56 +598,6 @@ a.entry-role:hover {
 @media (max-width: 600px) {
   .lightbox-nav { top: auto; bottom: 1.25rem; transform: none; }
   .lightbox-img { max-width: 92vw; }
-}
-
-/* ---------------------------------------------------------
-   Matrix scroller (drawn in script.js)
---------------------------------------------------------- */
-html {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-html::-webkit-scrollbar {
-  display: none;
-}
-
-.matrix-scroller {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 9999;
-  padding: 8px 8px 6px;
-  border: 1px solid var(--rule);
-  background-color: rgba(var(--paper-rgb), 0.92);
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.matrix-scroller:hover {
-  border-color: var(--ink-soft);
-}
-
-.matrix-canvas {
-  display: block;
-  width: 112px;
-  height: 112px;
-}
-
-.matrix-caption {
-  display: flex;
-  flex-direction: column;
-  margin: 6px 0 0;
-  font-size: 9.5px;
-  line-height: 1.35;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-@media (max-width: 480px) {
-  .matrix-scroller { display: none; }
 }
 
 /* ---------------------------------------------------------

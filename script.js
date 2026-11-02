@@ -9,29 +9,17 @@
   }
 
   /* ---------------------------------------------------------
-     Background field: one canvas that plays a "solve" driven
-     by scroll position.
+     Background field: one static canvas showing
        - contour lines of a potential u = sum q log|x - s|
-         (sources drift and levels flow as you scroll)
        - an FMM-style adaptive quadtree over point clusters
-         that refines one level at a time as you scroll down
-       - an overlapping domain decomposition whose active
-         subdomain sweeps left to right (highlighted contours)
-       - a block-diagonal / hierarchical matrix that mirrors the
-         tree and the sweep, drawn in the bottom-right corner where
-         it doubles as the scroll indicator (click / drag)
-     Everything is a pure function of scroll, so scrolling back
-     up un-refines. It only redraws while the scroll position is
-     changing, and is faded out behind the text column.
+       - an overlapping domain decomposition (highlighted contours)
+     It only redraws on resize or theme change, and is faded out
+     behind the text column.
   --------------------------------------------------------- */
   var field = document.getElementById("bgField");
-  var mCanvas = document.getElementById("matrixCanvas");
 
-  if (field && mCanvas) {
+  if (field) {
     var ctx = field.getContext("2d");
-    var mctx = mCanvas.getContext("2d");
-    var mScroller = document.getElementById("matrixScroller");
-    var mLabel = document.getElementById("matrixLabel");
     var column = document.querySelector(".main-content");
 
     var N_SUB = 4;           // subdomains
@@ -41,8 +29,9 @@
     var LEAF_CAP = 8;        // points per leaf before refining
     var LEVEL_STEP = 0.2;    // contour spacing in u
 
-    var W = 0, H = 0, S = 1, DPR = 1, GRID = 10, M_SIZE = 0;
-    var colLeft = 0, colRight = 0, scrollMax = 1;
+    var P = 0; // fixed "progress" of the solve shown in the background
+    var W = 0, H = 0, S = 1, DPR = 1, GRID = 10;
+    var colLeft = 0, colRight = 0;
     var colors = {};
     var values = new Float32Array(0); // potential on the grid, reused between frames
 
@@ -77,8 +66,8 @@
       colors.accent = cs.getPropertyValue("--accent").trim();
       // light mode needs more ink to read against the cream paper
       colors.tone = dark
-        ? { line: 0.14, tree: 0.2, acc: 0.42, fade: 0.82, matrix: 0.6 }
-        : { line: 0.3, tree: 0.4, acc: 0.62, fade: 0.78, matrix: 0.8 };
+        ? { line: 0.14, tree: 0.2, acc: 0.42, fade: 0.82 }
+        : { line: 0.3, tree: 0.4, acc: 0.62, fade: 0.78 };
     }
 
     // Canvas sizes follow their CSS boxes. Reallocating a canvas is
@@ -88,18 +77,15 @@
       var r = column.getBoundingClientRect();
       colLeft = r.left;
       colRight = r.right;
-      scrollMax = Math.max(root.scrollHeight - window.innerHeight, 1);
 
       var w = field.clientWidth, h = field.clientHeight;
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      var m = mCanvas.clientWidth;
-      if (w === W && h === H && dpr === DPR && m === M_SIZE) return;
-      W = w; H = h; DPR = dpr; M_SIZE = m;
+      if (w === W && h === H && dpr === DPR) return;
+      W = w; H = h; DPR = dpr;
       S = Math.min(W, H);
       GRID = Math.max(10, Math.round(W / 160)); // coarser grid on very wide screens
       field.width = Math.round(W * DPR);
       field.height = Math.round(H * DPR);
-      mCanvas.width = mCanvas.height = Math.round(M_SIZE * DPR);
     }
 
     /* --- geometry at scroll progress p --- */
@@ -205,45 +191,6 @@
       return Math.max(0, 1 - Math.abs(active - i));
     }
 
-    // block-diagonal matrix; each diagonal block splits further as the tree deepens
-    function drawMatrix(p, depth, active) {
-      var g = mctx, M = M_SIZE - 1, bs = M / N_SUB, i, l, k;
-      var levels = Math.min(4, Math.floor(depth - MIN_DEPTH));
-      g.setTransform(DPR, 0, 0, DPR, 0, 0);
-      g.clearRect(0, 0, M_SIZE, M_SIZE);
-      g.lineWidth = 1;
-      g.globalAlpha = colors.tone.matrix;
-      g.strokeStyle = colors.soft;
-      g.strokeRect(0.5, 0.5, M, M);
-      for (i = 0; i < N_SUB; i++) {
-        for (l = 0; l <= levels; l++) {
-          var s = bs / (1 << l);
-          for (k = 0; k < 1 << l; k++) g.strokeRect(0.5 + i * bs + k * s, 0.5 + i * bs + k * s, s, s);
-        }
-      }
-
-      g.fillStyle = g.strokeStyle = colors.accent;
-      for (i = 0; i < N_SUB; i++) {
-        var aw = weight(active, i);
-        if (!aw) continue;
-        g.globalAlpha = 0.25 * aw;
-        g.fillRect(0.5 + i * bs, 0.5 + i * bs, bs, bs);
-      }
-
-      // scroll position: current row / column of the matrix
-      var t = Math.round(p * M) + 0.5;
-      g.globalAlpha = 0.45;
-      g.beginPath();
-      g.moveTo(0, t); g.lineTo(M + 1, t);
-      g.moveTo(t, 0); g.lineTo(t, M + 1);
-      g.stroke();
-      g.globalAlpha = 1;
-      g.fillRect(t - 2.5, t - 2.5, 5, 5);
-
-      var label = "SUBDOMAIN \u03a9" + Math.min(N_SUB, Math.round(active) + 1) + "/" + N_SUB;
-      if (mLabel.textContent !== label) mLabel.textContent = label;
-    }
-
     function draw(p) {
       var tone = colors.tone, i;
       var depth = MIN_DEPTH + p * (MAX_DEPTH - MIN_DEPTH);
@@ -319,65 +266,20 @@
         ctx.fillRect(0, 0, W, H);
         ctx.globalCompositeOperation = "source-over";
       }
-
-      drawMatrix(p, depth, active);
-    }
-
-    /* --- scroll-driven loop: only runs while catching up --- */
-    var targetP = 0, curP = 0, rafId = 0;
-
-    function readScroll() {
-      targetP = clamp(window.scrollY / scrollMax, 0, 1);
-    }
-
-    function tick() {
-      rafId = 0;
-      curP = reduceMotion ? targetP : curP + (targetP - curP) * 0.14;
-      if (Math.abs(targetP - curP) < 0.0005) curP = targetP;
-      draw(curP);
-      if (curP !== targetP) rafId = requestAnimationFrame(tick);
-    }
-
-    function schedule() {
-      if (!rafId) rafId = requestAnimationFrame(tick);
     }
 
     function refresh() {
       measure();
-      readScroll();
-      draw(curP);
-      schedule();
+      draw(P);
     }
-
-    // matrix scroller: project the pointer onto the diagonal
-    var dragging = false;
-    function scrollFromPointer(e, behavior) {
-      var r = mCanvas.getBoundingClientRect();
-      var t = clamp((e.clientX - r.left + e.clientY - r.top) / (r.width + r.height), 0, 1);
-      window.scrollTo({ top: t * scrollMax, behavior: behavior });
-    }
-    mScroller.addEventListener("pointerdown", function (e) {
-      dragging = true;
-      scrollFromPointer(e, reduceMotion ? "instant" : "smooth");
-      try { mScroller.setPointerCapture(e.pointerId); } catch (err) {}
-    });
-    mScroller.addEventListener("pointermove", function (e) {
-      if (dragging) scrollFromPointer(e, "instant");
-    });
-    mScroller.addEventListener("pointerup", function () { dragging = false; });
-    mScroller.addEventListener("pointercancel", function () { dragging = false; });
 
     readColors();
-    measure();
-    readScroll();
-    curP = targetP;
-    draw(curP);
+    refresh();
 
-    window.addEventListener("scroll", function () { readScroll(); schedule(); }, { passive: true });
     window.addEventListener("resize", refresh);
-    // page height changes (fonts, images) without a window resize
+    // the text column can move without a window resize
     if ("ResizeObserver" in window) new ResizeObserver(refresh).observe(document.body);
-    new MutationObserver(function () { readColors(); draw(curP); })
+    new MutationObserver(function () { readColors(); draw(P); })
       .observe(root, { attributes: true, attributeFilter: ["data-theme"] });
   }
 
